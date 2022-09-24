@@ -1,5 +1,6 @@
 import json
 import os
+import numpy as np
 
 class StockcorError(Exception):
     """Generic class for error reporting"""
@@ -17,6 +18,7 @@ def LoadJSON(input_path):
 
     return imported_json
 
+
 def WriteJSON(input_path, input_dict):
     """Function to write a dict to file as json."""
 
@@ -27,3 +29,9 @@ def WriteJSON(input_path, input_dict):
         raise StockcorError(f"Could not find file {input_path}")
 
     return None
+
+
+def MovingAverage(a, n):
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n

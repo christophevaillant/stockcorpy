@@ -5,6 +5,7 @@ from stockcorpy.utils import StockcorError, WriteJSON, LoadJSON
 import datetime
 import time
 import logging
+import pandas as pd
 
 
 class PriceError(StockcorError):
@@ -68,7 +69,7 @@ class Price(ABC):
 
         # First load data
         if os.path.exists(self.data_filename):
-            self.raw_data = np.loadtxt(self.data_filename)
+            self.raw_data = pd.Series.from_csv(self.data_filename)
         else:
             raise PriceError(f"Could not find data file {self.data_filename}")
 
@@ -84,7 +85,7 @@ class Price(ABC):
         """Save the current price to the relevant file."""
 
         if self.raw_data is not None:
-            np.savetxt(self.data_filename, self.raw_data)
+            self.raw_data.to_csv(self.data_filename)
 
         WriteJSON(self.config_filename, self.configs)
 
@@ -97,8 +98,10 @@ class Price(ABC):
         from stockcorpy.utils import MovingAverage
 
         if self.clean_data is not None:
-            self.avg_data = MovingAverage(self.clean_data, self.configs["time_average"])
-            self.noise_data = self.clean_data[self.configs["time_average"]-1:] - self.avg_data
+            self.avg_data = pd.Series(MovingAverage(self.clean_data.values,
+                                                    self.configs["time_average"]))
+            self.noise_data = pd.Series(self.clean_data.values[self.configs["time_average"]-1:]
+                                        - self.avg_data)
             self.stdev = np.std(self.noise_data)
         elif self.raw_data is not None:
             self.avg_data = MovingAverage(self.raw_data, self.configs["time_average"])

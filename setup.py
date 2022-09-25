@@ -8,5 +8,6 @@ setup(
         "numpy>=1.23.0",
         "pycoingecko>=3.0.0",
         "matplotlib>=3.5.0",
+        "pandas>=1.5.0",
         ]
     )

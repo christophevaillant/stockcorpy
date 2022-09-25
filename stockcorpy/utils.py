@@ -2,6 +2,7 @@ import json
 import os
 import numpy as np
 
+
 class StockcorError(Exception):
     """Generic class for error reporting"""
     pass
@@ -11,7 +12,7 @@ def LoadJSON(input_path):
     """Function to load a json with standard settings."""
 
     if os.path.exists(input_path):
-        with open(input_path, "r")  as open_file:
+        with open(input_path, "r") as open_file:
             imported_json = json.read(open_file)
     else:
         raise StockcorError(f"Could not find file {input_path}")

@@ -1,10 +1,11 @@
 import numpy as np
-from abc import ABC
+from abc import ABC, abstractmethod
 import os
 from stockcorpy.utils import StockcorError, WriteJSON, LoadJSON
 import datetime
 import time
 import logging
+
 
 class PriceError(StockcorError):
     """Error specific to the price classes"""
@@ -18,11 +19,12 @@ class Price(ABC):
 
     def __init__(self, name, time_average=7):
         self.name = name
-        self.priceDir=os.path.join(os.getcwd(), name)
+        self.priceDir = os.path.join(os.getcwd(), name)
 
         # Data and its corresponding filename
         self.raw_data = None
-        self.data_filename = os.path.join(self.priceDir, f"{self.name}_raw.csv")
+        self.data_filename = os.path.join(self.priceDir,
+                                          f"{self.name}_raw.csv")
 
         # Define a few different time series and numbers that will be needed
         self.time = None
@@ -37,7 +39,8 @@ class Price(ABC):
             "initial_time": 0,
             "final_time": 0,
         }
-        self.config_filename = os.path.join(self.priceDir, f"{self.name}_configs.json")
+        self.config_filename = os.path.join(self.priceDir,
+                                            f"{self.name}_configs.json")
 
     @abstractmethod
     def CreatePrice(self):
@@ -93,7 +96,7 @@ class Price(ABC):
 
         from stockcorpy.utils import MovingAverage
 
-        if self.clean_data is not None and not reprocess:
+        if self.clean_data is not None:
             self.avg_data = MovingAverage(self.clean_data, self.configs["time_average"])
             self.noise_data = self.clean_data[self.configs["time_average"]-1:] - self.avg_data
             self.stdev = np.std(self.noise_data)
@@ -114,13 +117,14 @@ class Coin(Price):
     def __init__(self, name, time_average=7):
         super().__init__(self, name, time_average=7)
 
-
     def CreatePrice(self):
         """Download the specific coin's price history from the CoinGecko source"""
+        from pycoingecko import CoinGeckoAPI
 
         # ##########
         # Specific coingecko retrieval
         # ##########
+        cg = CoinGeckoAPI()
 
         # overwrite the initial time
         self.configs["initial_time"] = time.mktime(datetime.now().timetuple() -
@@ -133,7 +137,7 @@ class Coin(Price):
         self.configs["final_time"] = self.raw_data[-1, 0]
         self.time = self.raw_data[:, 0] - self.configs["final_time"]
 
-        # ##########        
+        # ##########
         # Do all the standard stuff
         # ##########
         super().CreatePrice()
@@ -142,7 +146,9 @@ class Coin(Price):
 
     def UpdatePrice(self):
         """Download any data that may have been created since the last download."""
+        from pycoingecko import CoinGeckoAPI
 
+        cg = CoinGeckoAPI()
         # Download the data
         new_data = np.array(cg.get_coin_market_chart_range_by_id(
             self.name, "eur", self.configs["final_time"],

@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+
+from stockcorpy.stock import Coin, PriceNotFoundError
+from stockcorpy.methods import RemoveMissingData, CalculateCorrelations, TrainNetworks, PredictCoins
+import os
+import pylab as pl
+import numpy as np
+import pandas as pd
+from optparse import OptionParser
+import logging
+
+logging.basicConfig()
+
+parser = OptionParser()
+parser.add_option("-c", "--create", dest="create_new", action="store_true",
+                  help="Recreate the coin's timeseries by downloading the data again.",
+                  default=False)
+
+options, args = parser.parse_args()
+
+# Load the list of coins to build the database from
+coin_list = {}
+with open("coin_list.txt", "r") as coin_file:
+    for line in coin_file:
+        name = line.strip()
+        coin = Coin(name)
+        coin_list[name] = coin
+
+# Cross-check the directory of existing coins with the requested coins
+coin_dir = os.listdir()
+for coin in coin_list.values():
+    if coin.name not in coin_dir or create_coins:
+        logging.info(f"Did not find coin {coin.name}, creating from scratch")
+        try:
+            coin.CreatePrice()
+        except PriceNotFoundError:
+            continue
+    else:
+        coin.LoadPrice()
+
+# Process the prices
+coin_df = RemoveMissingData(coin_list)
+for coin in coin_list.values():
+    logging.debug(f"Coin {coin.name} has shape {np.shape(coin.clean_data)} and {np.shape(coin.avg_data)}")
+    coin.ProcessPrice()
+
+# Calculate the correlations between all the coins
+corrs = {}
+for coin1 in coin_list.keys():
+    corrs[coin1] = {}
+    for coin2 in coin_list.keys():
+        corr_time, coeff = CalculateCorrelations(coin_list[coin1], coin_list[coin2])
+        corrs[coin1][coin2] = {"time": corr_time, "pearson": coeff}
+        logging.debug(f"Correlation time and correlation for coins {coin1} and {coin2} "
+                      f"are {corr_time} and {coeff}")
+
+# Store the most correlated coins for each parent coin
+for coin in coin_list.values():
+    coin.models["correlated"] = [corr_name for corr_name, corr_vals in corrs[coin.name].items() 
+                                 if abs(corr_vals["pearson"]) > 0.8]
+    logging.debug(f"{coin.name}: {coin.models['correlated']}")
+
+# Train all the models
+trained_coin_list = TrainNetworks(coin_list)
+
+cg = CoinGeckoAPI()
+while True:
+    now = datetime.datetime.now().timestamp()
+    before = (datetime.datetime.now() - datetime.timedelta(hours=1)).timestamp()
+    # update coins
+    for coin in trained_coin_list:
+        x = np.zeros((1, len(coin.models["correlated"])))
+        frame1 = pd.DataFrame(cg.get_coin_market_chart_range_by_id("bitcoin", "eur", before, now)
+                              ['prices'], columns=["raw_time", "bitcoin"])
+        

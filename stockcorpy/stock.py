@@ -183,7 +183,7 @@ class Coin(Price):
 
         # overwrite the initial time
         self.configs["initial_time"] = (datetime.datetime.now() -
-                                        datetime.timedelta(days=89)).timestamp()
+                                        datetime.timedelta(hours=24)).timestamp()
         # Retrieve the data
         try:
             self.raw_data = pd.DataFrame(cg.get_coin_market_chart_range_by_id(
@@ -196,7 +196,7 @@ class Coin(Price):
             # Set the final time
         if len(self.raw_data.values) == 0:
             raise PriceNotFoundError(f"Could not find coin {self.name}.")
-        print(f"Downloaded {self.name}: \n{self.raw_data.values}")
+        print(f"Downloaded {self.name}")
         # Unix time in ms
         self.configs["final_time"] = datetime.datetime.now().timestamp()
 

@@ -102,9 +102,9 @@ def TrainNetworks(wallet):
 
         # Set up the NN object
         print(f"Fitting {parent.name} with {parent.models['correlated']}")
-        nn = MLPRegressor(solver="lbfgs", hidden_layer_sizes=(max(1,round(0.5*(n_cor+1))),),
-                          alpha=0.0, max_iter=100000)
-        # nn = LinearRegression()
+        # nn = MLPRegressor(solver="lbfgs", hidden_layer_sizes=(max(1,round(0.5*(n_cor+1))),),
+        #                   alpha=0.0, max_iter=100000)
+        nn = LinearRegression()
         x = np.zeros((len(parent.noise_data)-1, n_cor), dtype='float')
 
         for i, child in enumerate(parent.models["correlated"]):

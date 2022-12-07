@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 from optparse import OptionParser
 import logging
+import datetime
+import time
+from pycoingecko import CoinGeckoAPI
 
 logging.basicConfig()
 
@@ -29,7 +32,7 @@ with open("coin_list.txt", "r") as coin_file:
 # Cross-check the directory of existing coins with the requested coins
 coin_dir = os.listdir()
 for coin in coin_list.values():
-    if coin.name not in coin_dir or create_coins:
+    if options.create_new:
         logging.info(f"Did not find coin {coin.name}, creating from scratch")
         try:
             coin.CreatePrice()
@@ -39,7 +42,7 @@ for coin in coin_list.values():
         coin.LoadPrice()
 
 # Process the prices
-coin_df = RemoveMissingData(coin_list)
+RemoveMissingData(coin_list, time_unit=300000.0)
 for coin in coin_list.values():
     logging.debug(f"Coin {coin.name} has shape {np.shape(coin.clean_data)} and {np.shape(coin.avg_data)}")
     coin.ProcessPrice()
@@ -57,19 +60,61 @@ for coin1 in coin_list.keys():
 # Store the most correlated coins for each parent coin
 for coin in coin_list.values():
     coin.models["correlated"] = [corr_name for corr_name, corr_vals in corrs[coin.name].items() 
-                                 if abs(corr_vals["pearson"]) > 0.8]
+                                 if abs(corr_vals["pearson"]) > 0.75]
     logging.debug(f"{coin.name}: {coin.models['correlated']}")
 
 # Train all the models
 trained_coin_list = TrainNetworks(coin_list)
 
 cg = CoinGeckoAPI()
+current_invests = {}
+spare = 100.0
 while True:
+    sell = []
+    buy = []
     now = datetime.datetime.now().timestamp()
     before = (datetime.datetime.now() - datetime.timedelta(hours=1)).timestamp()
+    coins = {}
     # update coins
-    for coin in trained_coin_list:
+    for coin in trained_coin_list.values():
+        print(f"Updating coin {coin.name}")
+        frame1 = pd.DataFrame(cg.get_coin_market_chart_range_by_id(coin.name, "eur", before, now)
+                              ['prices'], columns=["raw_time", coin.name])
+        coins[coin.name] = {"delta": np.gradient(frame1[coin.name].values)[-1],
+                            "value": frame1[coin.name].iat[-1]}
+    # predict the next point
+    for coin in trained_coin_list.values():
+        if len(coin.models["correlated"]) < 2:
+            continue
         x = np.zeros((1, len(coin.models["correlated"])))
-        frame1 = pd.DataFrame(cg.get_coin_market_chart_range_by_id("bitcoin", "eur", before, now)
-                              ['prices'], columns=["raw_time", "bitcoin"])
-        
+        for i, child in enumerate(coin.models["correlated"]):
+            x[0, i] = coins[child]["delta"] / trained_coin_list[child].stdev
+        coins[coin.name]["prediction"] = (coin.nn_integrator.predict(x.reshape(1, -1))
+                                          * coin.stdev) / coins[coin.name]["value"]
+        print(f"Predicted value increase for {coin.name} is {coins[coin.name]['prediction']}")
+        # Decide whether to buy or sell
+        if coins[coin.name]["prediction"] > 0.0:
+            if coin.name not in current_invests.keys():
+                print(f"Buying coin {coin.name}")
+                buy.append(coin.name)
+        elif coin.name in current_invests.keys():
+            print(f"Selling coin {coin.name}")
+            sell.append(coin.name)
+    # Sell all the coins
+    for coin in sell:
+        spare += coins[coin]["value"] * current_invests[coin]
+        del current_invests[coin]
+    print(f"Sold a total of {spare} euros")
+    # Buy the new coins
+    for coin in buy:
+        current_invests[coin] = (spare / len(buy)) / coins[coin]["value"]
+    # Set the amount of spare cash to zero if there's been any new buys
+    if len(buy) > 0:
+        spare = 0.0
+    total_money = 0.0
+    for coin in current_invests.keys():
+        total_money += current_invests[coin] * coins[coin]["value"]
+    print(f"Current investments are now: {current_invests}")
+    print(f"Total current money is {total_money}")
+    # Sleep for 10 minutes
+    time.sleep(600)

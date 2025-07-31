@@ -41,7 +41,7 @@ def RemoveMissingData(coin_list, time_unit=3600000.0):
     coin_df = pd.DataFrame(next(iter(coin_list.values())).raw_data["time"])
     for coin in coin_list.values():
         coin.raw_data.drop_duplicates(subset="time", keep="last", inplace=True)
-        coin_df = coin_df.merge(coin.raw_data, on="time", how="inner", copy=False)
+        coin_df = coin_df.merge(coin.raw_data[["time", coin.name]], on="time", how="left", copy=False)
         coin_df.drop_duplicates(subset="time", keep="last", inplace=True)
 
     # Clean the data by removing columns that have holes
@@ -81,7 +81,7 @@ def CalculateCorrelations(coin1, coin2, length=70):
     correlation /= length
     corr_time = np.trapz(correlation)/np.sqrt(np.square(coin1.stdev) * np.square(coin2.stdev))
 
-    pearson = np.corrcoef(coin1.noise_data, y=coin2.noise_data)
+    pearson = np.corrcoef(coin1.grad_data[coin1.configs["time_average"]-1:], y=coin2.noise_data)
 
     return (corr_time, pearson[0,1])
 
@@ -105,10 +105,11 @@ def TrainNetworks(wallet):
         # nn = MLPRegressor(solver="lbfgs", hidden_layer_sizes=(max(1,round(0.5*(n_cor+1))),),
         #                   alpha=0.0, max_iter=100000)
         nn = LinearRegression()
-        x = np.zeros((len(parent.noise_data)-1, n_cor), dtype='float')
+        x = np.zeros((len(parent.noise_data), n_cor), dtype='float')
 
         for i, child in enumerate(parent.models["correlated"]):
-            x[:, i] = wallet[child].noise_data[:-1] / wallet[child].stdev
+            x[:, i] = (wallet[child].grad_data[wallet[child].configs["time_average"]-2:-1] /
+                       wallet[child].grad_stdev)
 
         nn.fit(x, parent.noise_data[1:] / parent.stdev)
         # print(f"Coin {parent.name} ran with {nn.n_iter_} iterations")
@@ -153,7 +154,7 @@ def TakeStep(coin, step, x, wallet, date, trial):
 
     if step == 0:
         for i, child in enumerate(coin.models["correlated"]):
-            x[coin.name][0, i] = wallet[child].noise_data.iat[-1] / wallet[child].stdev
+            x[coin.name][0, i] = wallet[child].grad_data.iat[-1] / wallet[child].grad_stdev
         x[coin.name].reshape(1, -1)
         delta = (coin.nn_integrator.predict(x[coin.name])) * coin.stdev
         # delta = (np.random.normal() + coin.nn_integrator.predict(x[coin.name])) * coin.stdev

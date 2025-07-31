@@ -62,6 +62,9 @@ class Price(ABC):
         grab the history. Also set up the directory and save
         the raw data."""
 
+        # Unix time in ms
+        self.configs["final_time"] = datetime.datetime.now().timestamp()
+
         self.raw_data.sort_values("time")
 
         # Check the directory exists, otherwise create it
@@ -125,17 +128,20 @@ class Price(ABC):
         from stockcorpy.utils import MovingAverage
 
         if self.clean_data is not None:
-            self.avg_data = pd.Series(MovingAverage(self.clean_data[self.name].values,
-                                                    self.configs["time_average"]))
-            self.noise_data = pd.Series(np.gradient(self.clean_data[self.name].values))
+            self.avg_data = MovingAverage(self.clean_data[self.name].values,
+                                          self.configs["time_average"])
+            self.grad_data = pd.Series(np.gradient(self.clean_data[self.name].values))
+            self.noise_data = (self.clean_data[self.name][self.configs["time_average"]-1:] -
+                               self.avg_data)
+            self.grad_stdev = np.std(self.grad_data)
             self.stdev = np.std(self.noise_data)
-            self.noise_data.to_csv(f"{self.name}_noise.csv")
+            self.noise_data.to_csv(f"{self.priceDir}/{self.name}_noise.csv")
             print(f"Coin {self.name} has saved noise data from clean")
         elif self.raw_data is not None:
             self.avg_data = MovingAverage(self.raw_data, self.configs["time_average"])
             self.noise_data = self.raw_data[self.configs["time_average"]-1:] - self.avg_data
             self.stdev = np.std(self.noise_data)
-            self.noise_data.to_csv(f"{self.name}_noise.csv")
+            self.noise_data.to_csv(f"{self.priceDir}/{self.name}_noise.csv")
             print(f"Coin {self.name} has saved noise data from raw")
         else:
             raise PriceError("No data currently loaded.")
@@ -172,7 +178,7 @@ class Coin(Price):
     def __init__(self, name, time_average=7):
         super().__init__(name, time_average=time_average)
 
-    def CreatePrice(self):
+    def CreatePrice(self, days=1):
         """Download the specific coin's price history from the CoinGecko source"""
         from pycoingecko import CoinGeckoAPI
 
@@ -183,7 +189,7 @@ class Coin(Price):
 
         # overwrite the initial time
         self.configs["initial_time"] = (datetime.datetime.now() -
-                                        datetime.timedelta(hours=24)).timestamp()
+                                        datetime.timedelta(days=days)).timestamp()
         # Retrieve the data
         try:
             self.raw_data = pd.DataFrame(cg.get_coin_market_chart_range_by_id(
@@ -197,8 +203,6 @@ class Coin(Price):
         if len(self.raw_data.values) == 0:
             raise PriceNotFoundError(f"Could not find coin {self.name}.")
         print(f"Downloaded {self.name}")
-        # Unix time in ms
-        self.configs["final_time"] = datetime.datetime.now().timestamp()
 
         # Set the zero, time is returned in milliseconds
         # self.raw_data["time"] -= self.configs["initial_time"] * 1000.0
@@ -207,8 +211,6 @@ class Coin(Price):
         # Do all the standard stuff
         # ##########
         super().CreatePrice()
-
-        return None
 
     def UpdatePrice(self):
         """Download any data that may have been created since the last download."""
@@ -230,4 +232,50 @@ class Coin(Price):
             self.configs["final_time"] = datetime.datetime.now().timestamp()
             self.SavePrice(backup=True)
 
-        return None
+
+class Stock(Price):
+    """Derived from the Price class, this class implements the specific functions
+    for stock prices, using the polygon api."""
+
+    def __init__(self, name, time_average=7):
+        super().__init__(name, time_average=time_average)
+
+    def CreatePrice(self, days=1):
+        """Download the specific stock's price history from the polygon source"""
+        from polygon import RESTClient
+
+        client = RESTClient(os.environ("POLYGON_API_KEY"))
+        now = datetime.datetime.now()
+        two_years = now - datetime.timedelta(days=729)
+        ticker = client.list_aggs(self.name, 1, "day", two_years.strftime("%Y-%m-%d"),
+                                  now.strftime("%Y-%m-%d"), limit=50000)
+        data = {"raw_time": [], "prices": []}
+        for datum in ticker:
+            data['raw_time'].append(datum.timestamp)
+            data['prices'].append(datum.open)
+        self.raw_data = pd.DataFrame(data)
+
+        super().CreatePrice()
+
+    def UpdatePrice(self):
+        """Download any data that may have been created since the last download."""
+        from polygon import RESTClient
+
+        client = RESTClient(os.environ("POLYGON_API_KEY"))
+        now = datetime.datetime.now()
+        final_time = datetime.date.fromtimestamp(self.configs["final_time"])
+        
+        ticker = client.list_aggs(self.name, 1, "day", final_time.strftime("%Y-%m-%d"),
+                                  now.strftime("%Y-%m-%d"), limit=50000)
+        new_data = {"raw_time": [], "prices": []}
+        for datum in ticker:
+            new_data['raw_time'].append(datum.timestamp)
+            new_data['prices'].append(datum.open)
+        new_df = pd.DataFrame(new_data)x
+
+        if len(new_data) == 0:
+            logging.warning(f"Nothing to be updated for coin {self.name}.")
+        else:
+            self.raw_data = pd.concat([self.raw_data, new_df], ignore_index=True)
+            self.configs["final_time"] = datetime.datetime.now().timestamp()
+            self.SavePrice(backup=True)

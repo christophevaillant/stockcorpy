@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, date        from pycoingecko import CoinGeckoAPI
+from datetime import datetime, timedelta, date
 
 import logging
 

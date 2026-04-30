@@ -57,7 +57,7 @@ class Data(ABC):
         for point in self.raw_data:
             day = point.date - self.start_date + timedelta(days=offset_days)
             unsorted.append(ProcessedDataPoint(day.days, point.value))
-        self.processed_data = sorted(unsorted, key=lambda x: x.day)
+        self.processed_data = sorted(unsorted, key=lambda x: x.days)
 
 
     def plot_data(self, ylabel: str, graph_file: Path | None = None):

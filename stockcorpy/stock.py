@@ -1,9 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 import os
-from stockcorpy.utils import StockcorError, WriteJSON, LoadJSON
+from .utils import StockcorError, WriteJSON, LoadJSON
 import datetime
-import time
 import logging
 import pandas as pd
 import pylab as pl
@@ -125,7 +124,7 @@ class Price(ABC):
         """Create a few of the time series from the raw data in order to make
         these available for other methods"""
 
-        from stockcorpy.utils import MovingAverage
+        from .utils import MovingAverage
 
         if self.clean_data is not None:
             self.avg_data = MovingAverage(self.clean_data[self.name].values,
@@ -271,7 +270,7 @@ class Stock(Price):
         for datum in ticker:
             new_data['raw_time'].append(datum.timestamp)
             new_data['prices'].append(datum.open)
-        new_df = pd.DataFrame(new_data)x
+        new_df = pd.DataFrame(new_data)
 
         if len(new_data) == 0:
             logging.warning(f"Nothing to be updated for coin {self.name}.")

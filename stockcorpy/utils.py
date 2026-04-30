@@ -1,37 +1,7 @@
 import json
 import os
 import numpy as np
-
-
-class StockcorError(Exception):
-    """Generic class for error reporting"""
-    pass
-
-
-def LoadJSON(input_path):
-    """Function to load a json with standard settings."""
-
-    if os.path.exists(input_path):
-        with open(input_path, "r") as open_file:
-            imported_json = json.load(open_file)
-    else:
-        raise StockcorError(f"Could not find file {input_path}")
-
-    return imported_json
-
-
-def WriteJSON(input_path, input_dict):
-    """Function to write a dict to file as json."""
-
-    try:
-        with open(input_path, "w") as open_file:
-            json.dump(input_dict, open_file, ensure_ascii=False, indent=4, default=convert)
-    except:
-        raise StockcorError(f"Could not write to file {input_path} with json {input_dict} and "
-                            f"type {type(input_dict)}")
-
-    return None
-
+from datetime import datetime, date, timedelta
 
 def MovingAverage(a, n):
     ret = np.cumsum(a, dtype=float)
@@ -41,3 +11,12 @@ def MovingAverage(a, n):
 def convert(o):
     if isinstance(o, np.int64): return int(o)  
     raise TypeError
+
+def round_to_nearest_day(dt: datetime) -> date:
+    midnight = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    if dt.hour >= 12:
+        rounded = midnight + timedelta(days=1)
+    else:
+        rounded = midnight
+    return rounded.date()
+

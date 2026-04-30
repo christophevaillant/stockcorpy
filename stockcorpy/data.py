@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pickle import dump, load
 from pathlib import Path
 import logging
@@ -47,7 +47,7 @@ class Data(ABC):
         pass
 
     @abstractmethod
-    def process_data(self, offset: int = 0):
+    def process_data(self, offset_days: int = 0):
         dates = [point.date for point in self.raw_data]
         start_date = min(dates)
         end_date = max(dates)
@@ -55,14 +55,22 @@ class Data(ABC):
         logger.info(f"Found data points between {start_date} and {end_date}, a total of {length.days} days")
         unsorted = []
         for point in self.raw_data:
-            day = point.date - self.start_date
-            unsorted.append(ProcessedDataPoint(day, point.value))
+            day = point.date - self.start_date + timedelta(days=offset_days)
+            unsorted.append(ProcessedDataPoint(day.days, point.value))
         self.processed_data = sorted(unsorted, key=lambda x: x.day)
 
 
-    @abstractmethod
-    def plot_data(self):
-        pass
+    def plot_data(self, ylabel: str, graph_file: Path | None = None):
+        if not self.processed_data:
+            raise DataPointError("Data has not been processed yet")
+        dates, values = self.convert_processed_to_list()
+        pl.plot(dates, values, 'k.')
+        pl.xlabel(f"Days from {self.start_date} - 1")
+        pl.ylabel(ylabel)
+        if graph_file:
+            pl.savefig(graph_file)
+        else:
+            pl.show()
 
     def convert_processed_to_list(self) -> tuple[list[int], list[float]]:
         days = [point.day for point in self.processed_data]

@@ -83,13 +83,4 @@ class Keyword(Data):
             return 0.0
 
     def plot_data(self, graph_file: Path | None = None):
-        if not self.processed_data:
-            raise DataPointError("Data has not been processed yet")
-        dates, values = self.convert_processed_to_list()
-        pl.plot(dates, values, 'k.')
-        pl.xlabel(f"Days from {self.start_date}")
-        pl.ylabel("Keyword score")
-        if graph_file:
-            pl.savefig(graph_file)
-        else:
-            pl.show()
+        super().plot_data("Keyword score", graph_file=graph_file)

@@ -1,15 +1,12 @@
-import numpy as np
-from abc import ABC, abstractmethod
 import os
-import datetime
+from datetime import date, datetime, timedelta
 import logging
-import pylab as pl
-import copy
 
 from massive import RESTClient
 
 from .data import Data, RawDataPoint,DataPointError
 
+logger = logging.getLogger("stock")
 
 class StockError(DataPointError):
     """Error specific to the stock class"""
@@ -44,8 +41,14 @@ class Stock(Data):
         )
         existing_dates = self.retrieve_dates()
         for datum in ticker:
-            ticker_date = date(datum.timestamp / 1000)
+            ticker_date = date.fromtimestamp(datum.timestamp / 1000)
             if ticker_date not in existing_dates:
                 self.raw_data.append(RawDataPoint(
                     date=ticker_date,
                     value=datum.open))
+
+    def process_data(self, offset_days = -1):
+        return super().process_data(offset_days=offset_days)
+    
+    def plot_data(self, graph_file: Path | None = None):
+        super().plot_data("Stock price", graph_file=graph_file)

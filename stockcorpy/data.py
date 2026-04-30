@@ -73,7 +73,7 @@ class Data(ABC):
             pl.show()
 
     def convert_processed_to_list(self) -> tuple[list[int], list[float]]:
-        days = [point.day for point in self.processed_data]
+        days = [point.days for point in self.processed_data]
         values = [point.value for point in self.processed_data]
         return days, values
     

@@ -3,6 +3,7 @@ import pylab as pl
 import logging
 from datetime import datetime, date
 from pathlib import Path
+import os
 
 from newsapi import NewsApiClient
 from newspaper import Article
@@ -24,20 +25,26 @@ class Keyword(Data):
         else:
             self.create_keyword_data()
 
-    def create_data(self):
+    def create_data(self, number_of_days):
+        if number_of_days >= 30:
+            logger.warning("Number of days exceeds allowed value from provider, defaulting to 30 days")
+            number_of_days = 30
+        stored_days = date.today() - self.end_date
+        if stored_days > 0:
+            number_of_days = stored_days
+
         self._load_analyzers()
-        articles = self._get_articles()
+        articles = self._get_articles(date.today - number_of_days)
 
         logger.info(f"found {len(articles)} new articles")
-        self.raw_data = {}
         for article in articles:
             date = round_to_nearest_day(
                 datetime.fromisoformat(article['publishedAt'])
             )
-            average = self._analyze_article(article)
-            if date not in self.raw_data:
-                self.raw_data[date] = 0.0
-            self.raw_data[date] += average
+            existing_dates = self.retrieve_dates()
+            if date not in existing_dates:
+                average = self._analyze_article(article)
+            self.raw_data[date] = average
 
     def _load_analyzers(self):
         tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
@@ -54,9 +61,9 @@ class Keyword(Data):
             'neutral': 0.0,
         }
 
-    def _get_articles(self) -> list:
-        newsapi = NewsApiClient(api_key='a94ce8aa988f49d29aa69e6fc051ac69')
-        keyword_responses = newsapi.get_everything(q='AI integration', language='en')
+    def _get_articles(self, date_range: date) -> list:
+        newsapi = NewsApiClient(api_key=os.environ("NEWS_API_KEY"))
+        keyword_responses = newsapi.get_everything(q='AI integration', from=date_range.isoformat(), language='en')
         return keyword_responses['articles']
 
     def _analyze_article(self, article: list) -> float:

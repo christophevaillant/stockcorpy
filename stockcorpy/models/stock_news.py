@@ -5,6 +5,7 @@ from numpy import corrcoef
 
 from ..core.stock import Stock
 from ..core.news import Keyword
+from ..core.utils import load_sentiment_classifier
 from .model import Model
 
 logger = logging.getLogger("stock-news")
@@ -20,6 +21,7 @@ class StockNews(Model):
         self.stocks = []
         self.keywords = []
         self.stocks_to_keywords = {}
+        self.sentiment_classifier = load_sentiment_classifier()
 
     def create_model(self):
         logger.info("--------------------------------------")
@@ -28,18 +30,18 @@ class StockNews(Model):
 
         logger.info("--------------------------------------")
         logger.info("Loading keywords:")
-        self.keywords = self._load_data_from_list(Keyword, self.keywordnames)
+        self.keywords = self._load_data_from_list(Keyword, self.keywordnames, classifier = self.sentiment_classifier)
 
     def update_model(self):
         for data in self.stocks + self.keywords:
             data.create_data(self.initial_number_days)
             data.process_data()
 
-    def _load_data_from_file(self, cls, data_names):
+    def _load_data_from_list(self, cls, data_names, **kwargs):
         data_list = []
         for name in data_names:
             logger.info(f"Loading {name}")
-            new_data = cls(name)
+            new_data = cls(name, **kwargs)
             new_data.create_data(self.initial_number_days)
             new_data.process_data()
             data_list.append(new_data)
@@ -60,3 +62,6 @@ class StockNews(Model):
                 correlated_keywords.append(keyword.name)
                 logger.info(f"Found keyword {keyword.name} with correlation {correlation}")
         return correlated_keywords
+    
+    def predict_next_day(self):
+        raise NotImplementedError("This is just a placeholder")

@@ -1,5 +1,3 @@
-import json
-import os
 import numpy as np
 from datetime import datetime, date, timedelta
 
@@ -20,3 +18,10 @@ def round_to_nearest_day(dt: datetime) -> date:
         rounded = midnight
     return rounded.date()
 
+def load_sentiment_classifier():
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    from transformers import pipeline
+
+    tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
+    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+    return pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)

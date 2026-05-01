@@ -8,21 +8,21 @@ import os
 from newsapi import NewsApiClient
 from newspaper import Article
 from newspaper.exceptions import ArticleException, ArticleBinaryDataException
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from transformers import pipeline
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .data import Data, RawDataPoint
-from .utils import round_to_nearest_day
+from .utils import round_to_nearest_day, load_sentiment_classifier
 
 logger = logging.getLogger("news")
 
 API_DAYS_LIMIT = 30
 
 class Keyword(Data):
-    def __init__(self, keyword: str, storage_file: Path | None = None):
+    def __init__(self, keyword: str, storage_file: Path | None = None, classifier = None):
         super().__init__()
         self.keyword = keyword
+        if classifier:
+            self.classifier = classifier
         if storage_file:
             self.load_from_file(storage_file)
         else:
@@ -62,14 +62,14 @@ class Keyword(Data):
         return super().process_data(offset_days)
 
     def _load_analyzers(self):
-        tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-        model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
-        self.classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+        if not self.classifier:
+            self.classifier = load_sentiment_classifier()
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=400,        # Safe margin under the 512 limit
             chunk_overlap=80,      # 20% overlap to maintain context
             separators=["\n\n", "\n", ".", " ", ""]
         )
+
         self.sentiment_mapping = {
             'positive': 1.0,
             'negative': -1.0,

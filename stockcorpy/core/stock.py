@@ -5,7 +5,7 @@ from pathlib import Path
 
 from massive import RESTClient
 
-from .data import Data, RawDataPoint,DataPointError
+from .data import Data, RawDataPoint, DataPointError
 
 logger = logging.getLogger("stock")
 

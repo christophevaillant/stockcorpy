@@ -5,6 +5,8 @@ from pickle import dump, load
 from pathlib import Path
 import logging
 
+import pylab as pl
+
 logger = logging.getLogger("data")
 
 class DataPointError(RuntimeError):
@@ -28,19 +30,14 @@ class Data(ABC):
         self.start_date: date = date.today()
         self.end_date: date = date.today()
 
-    @classmethod
-    def load_from_file(cls, filepath: Path):
-        obj = cls()
-        with open(filepath, "r") as datafile:
-            obj.raw_data = load(datafile)
-        existing_dates = obj.retrieve_dates()
-        obj.start_date = min(existing_dates)
-        obj.end_date = max(existing_dates)
-        return obj
+    @staticmethod
+    def load_from_file(filepath: Path):
+        with open(filepath, "rb") as datafile:
+             return load(datafile)
 
     def save_to_file(self, filepath: Path):
-        with open(filepath, "w") as datafile:
-            dump(self.raw_data, datafile)
+        with open(filepath, "wb") as datafile:
+            dump(self, datafile)
 
     @abstractmethod
     def create_data(self, number_of_days: int):

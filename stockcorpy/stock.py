@@ -1,6 +1,7 @@
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
+from pathlib import Path
 
 from massive import RESTClient
 
@@ -30,8 +31,8 @@ class Stock(Data):
         """Download the specific stock's price history from the polygon source"""
 
         client = RESTClient(os.environ["POLYGON_API_KEY"])
-        now = datetime.datetime.now()
-        timespan = now - datetime.timedelta(days=number_of_days)
+        now = datetime.now()
+        timespan = now - timedelta(days=number_of_days)
         ticker = client.list_aggs(
             self.name,
             1, 

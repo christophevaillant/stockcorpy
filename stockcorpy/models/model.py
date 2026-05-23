@@ -14,6 +14,10 @@ class Model(ABC):
     @abstractmethod
     def update_model(self):
         pass
+
+    @abstractmethod
+    def process_model_data(self):
+        pass
         
     def save_model(self):
         filename = f"{self.model_name}.pickle"

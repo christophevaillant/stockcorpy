@@ -2,10 +2,11 @@ import os
 from datetime import date, datetime, timedelta
 import logging
 from pathlib import Path
+from enum import Enum
 
 from massive import RESTClient
 
-from .data import Data, RawDataPoint, DataPointError
+from .data import Data, RawDataPoint, DataPointError, ProcessedDataPoint
 
 logger = logging.getLogger("stock")
 
@@ -17,6 +18,10 @@ class StockError(DataPointError):
 class StockNotFoundError(DataPointError):
     """Error specific to the price classes"""
     pass
+
+class StockProcessingMode(Enum):
+    VALUE = 0
+    DIFFERENCE = 1
 
 
 class Stock(Data):
@@ -47,9 +52,23 @@ class Stock(Data):
                 self.raw_data.append(RawDataPoint(
                     date=ticker_date,
                     value=datum.open))
+        super().create_data(number_of_days)
 
-    def process_data(self, offset_days = -1):
-        return super().process_data(offset_days=offset_days)
+    def process_data(self, mode: StockProcessingMode = StockProcessingMode.VALUE, offset_days = -1):
+        super().process_data(offset_days=offset_days)
+        if mode == StockProcessingMode.DIFFERENCE:
+            days = [point.days for point in self.processed_data]
+            values = [point.value for point in self.processed_data]
+            new_data = []
+            for i in range(1, len(self.processed_data)):
+                if days[i-1] == days[i] - 1:
+                    new_data.append(
+                        ProcessedDataPoint(
+                            days=days[i],
+                            value= values[i] - values[i-1]
+                            )
+                        )
+            self.processed_data = new_data
     
     def plot_data(self, graph_file: Path | None = None):
         super().plot_data("Stock price", graph_file=graph_file)

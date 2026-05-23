@@ -26,7 +26,7 @@ class Coin(Data):
     def __init__(self, name, time_average=7):
         super().__init__(name, time_average=time_average)
 
-    def create_data(self, number_of_days=1):
+    def create_data(self, number_of_days=30):
         """Download the specific coin's price history from the CoinGecko source"""
 
         cg = CoinGeckoAPI()
@@ -48,12 +48,14 @@ class Coin(Data):
                         date=point_date,
                         value=point[1]
                     ))
+        
         except ValueError:
             raise DataPointError(f"Could not find coin with id {self.name}")
 
         if len(self.raw_data) == 0:
             raise DataPointError(f"Could not find coin {self.name}.")
         logger.info(f"Downloaded {self.name}")
+        super().create_data(number_of_days)
 
     def process_data(self, offset_days = -1):
         return super().process_data(offset_days=offset_days)

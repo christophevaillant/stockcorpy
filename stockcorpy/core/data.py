@@ -23,7 +23,6 @@ class ProcessedDataPoint:
     value: float
 
 class Data(ABC):
-    @abstractmethod
     def __init__(self):
         self.raw_data: list[RawDataPoint] = []
         self.processed_data: list[ProcessedDataPoint] | None = None
@@ -41,15 +40,36 @@ class Data(ABC):
 
     @abstractmethod
     def create_data(self, number_of_days: int):
-        pass
+        dates = [point.date for point in self.raw_data]
+        if not dates:
+            raise DataPointError("No dates found")
+        self.start_date = min(dates)
+        self.end_date = max(dates)
+        length = self.end_date - self.start_date
+        logger.info(f"Found data points between {self.start_date} and {self.end_date}, a total of {length.days} days")
+        
 
     @abstractmethod
     def process_data(self, offset_days: int = 0):
-        dates = [point.date for point in self.raw_data]
-        start_date = min(dates)
-        end_date = max(dates)
-        length = end_date - start_date
-        logger.info(f"Found data points between {start_date} and {end_date}, a total of {length.days} days")
+        # self._pad_data()
+        self._sort_data(offset_days)
+
+    def _pad_data(self):
+        number_days = self.end_date - self.start_date
+        logger.debug(f"Found number of days {number_days.days} between {self.start_date} and {self.end_date}")
+        expected_dates = set(range(0, number_days.days))
+        actual_dates = {point.days for point in self.processed_data}
+        missing_dates = expected_dates - actual_dates
+        logger.debug(f"Expected dates: {expected_dates}")
+        logger.debug(f"Actual dates: {actual_dates}")
+        logger.debug(f"Found missing days: {missing_dates}")
+        for missing in missing_dates:
+            self.raw_data.append(RawDataPoint(
+                date=self.start_date + timedelta(days=missing),
+                value=0.0,
+            ))
+
+    def _sort_data(self, offset_days):
         unsorted = []
         for point in self.raw_data:
             day = point.date - self.start_date + timedelta(days=offset_days)

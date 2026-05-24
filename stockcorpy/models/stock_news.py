@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from scipy.stats import pearsonr
 
-from ..core.stock import Stock
+from ..core.stock import Stock, StockProcessingMode
 from ..core.news import Keyword
 from ..core.data import DataPointError
 from .model import Model
@@ -13,7 +13,7 @@ from .model import Model
 logger = logging.getLogger("stock-news")
 
 class StockNews(Model):
-    initial_number_days = 30
+    initial_number_days = 50
     threshold_correlation = 0.5
 
     def __init__(self, model_name, stock_filename: Path, keyword_filename: Path):
@@ -57,10 +57,14 @@ class StockNews(Model):
         self.start_date = min(all_dates)
         self.end_date = max(all_dates)
         logger.debug(f"Found dates between {self.start_date} and {self.end_date}")
-        for data in self.stocks + self.keywords:
+        for data in self.keywords:
             data.start_date = self.start_date
             data.end_date = self.end_date
             data.process_data()
+        for data in self.stocks:
+            data.start_date = self.start_date
+            data.end_date = self.end_date
+            data.process_data(StockProcessingMode.DIFFERENCE)
 
     def train_model(self):
         for stock in self.stocks:
@@ -75,14 +79,18 @@ class StockNews(Model):
         for keyword in self.keywords:
             keyword_days = {point.days for point in keyword.processed_data}
             joint_days = stock_days & keyword_days
-            logger.debug(f"Found {len(joint_days)} joint days")
-            stock_data = [point.value for point in stock.processed_data if point.days in joint_days]
-            keyword_data = [point.value for point in keyword.processed_data if point.days in joint_days]
-            correlation = pearsonr(stock_data, keyword_data)
-            logger.debug(f"Stock {stock.name} keyword {keyword.keyword}: {correlation.statistic}")
-            if abs(correlation.statistic) >= self.threshold_correlation:
-                correlated_keywords.append(keyword.keyword)
-                logger.info(f"Found keyword {keyword.keyword} with correlation {correlation.statistic}")
+            if len(joint_days) > 5:
+                logger.debug(f"Found {len(joint_days)} joint days")
+                stock_data = [point.value for point in stock.processed_data if point.days in joint_days]
+                keyword_data = [point.value for point in keyword.processed_data if point.days in joint_days]
+                if len(set(stock_data)) == 1 or len(set(keyword_data)) == 1:
+                    logger.debug(f"Skipping {keyword.keyword}: zero variance")
+                    continue
+                correlation = pearsonr(stock_data, keyword_data)
+                logger.debug(f"Stock {stock.name} keyword {keyword.keyword}: {correlation.statistic}, with {correlation.pvalue}")
+                if abs(correlation.statistic) >= self.threshold_correlation:
+                    correlated_keywords.append(keyword.keyword)
+                    logger.info(f"Found keyword {keyword.keyword} with correlation {correlation.statistic}")
         return correlated_keywords
     
     def predict_next_day(self):

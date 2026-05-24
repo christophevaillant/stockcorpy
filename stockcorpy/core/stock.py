@@ -54,7 +54,11 @@ class Stock(Data):
                     value=datum.open))
         super().create_data(number_of_days)
 
-    def process_data(self, mode: StockProcessingMode = StockProcessingMode.VALUE, offset_days = -1):
+    def process_data(
+            self,
+            mode: StockProcessingMode = StockProcessingMode.VALUE,
+            offset_days = 1
+        ):
         super().process_data(offset_days=offset_days)
         if mode == StockProcessingMode.DIFFERENCE:
             days = [point.days for point in self.processed_data]

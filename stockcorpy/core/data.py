@@ -41,6 +41,7 @@ class Data(ABC):
     @abstractmethod
     def create_data(self, number_of_days: int):
         dates = [point.date for point in self.raw_data]
+        logger.debug(f"Found raw dates {dates}")
         if not dates:
             raise DataPointError("No dates found")
         self.start_date = min(dates)

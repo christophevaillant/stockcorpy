@@ -38,6 +38,7 @@ class Stock(Data):
         client = RESTClient(os.environ["POLYGON_API_KEY"])
         now = datetime.now()
         timespan = now - timedelta(days=number_of_days)
+        logger.debug(f"Searching between {now} and {timespan} for {self.name}")
         ticker = client.list_aggs(
             self.name,
             1, 
@@ -49,6 +50,7 @@ class Stock(Data):
         for datum in ticker:
             ticker_date = date.fromtimestamp(datum.timestamp / 1000)
             if ticker_date not in existing_dates:
+                logger.debug(f"Found date {ticker_date} for {self.name}")
                 self.raw_data.append(RawDataPoint(
                     date=ticker_date,
                     value=datum.open))
